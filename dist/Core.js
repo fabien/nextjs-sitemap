@@ -19,6 +19,7 @@ const helpers_1 = require("./helpers");
 const utils_1 = require("./utils");
 class Core {
     constructor(config) {
+        var _a;
         this.xmlHeader = '<?xml version="1.0" encoding="UTF-8" ?>\n';
         this.xmlURLSet = `<urlset xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 
     http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" 
@@ -49,12 +50,28 @@ class Core {
             this.writeFooter();
         });
         this.writeHeader = () => __awaiter(this, void 0, void 0, function* () {
-            var _a, _b;
-            const xmlStyles = (_b = (_a = this.sitemapStylesheet) === null || _a === void 0 ? void 0 : _a.reduce((accum, { type, styleFile }) => accum + `<?xml-stylesheet href="${styleFile}" type="${type}" ?>\n`, '')) !== null && _b !== void 0 ? _b : '';
+            var _b, _c;
+            const xmlStyles = (_c = (_b = this.sitemapStylesheet) === null || _b === void 0 ? void 0 : _b.reduce((accum, { type, styleFile }) => accum + `<?xml-stylesheet href="${styleFile}" type="${type}" ?>\n`, '')) !== null && _c !== void 0 ? _c : '';
             fs_1.default.writeFileSync(path_1.default.resolve(this.targetDirectory, './sitemap.xml'), this.xmlHeader + xmlStyles + this.xmlURLSet, { flag: 'w' });
         });
         this.writeSitemap = ({ sitemap }) => {
-            if (!this.langs) {
+            if (this.langs.length > 0) {
+                sitemap.forEach((url) => {
+                    this.langs.forEach((lang) => {
+                        const alternateUrls = this.langs.reduce((accum, altLang) => {
+                            const baseUrl = this.localizedUrl(altLang);
+                            return (accum +
+                                `\n        <xhtml:link rel="alternate" hreflang="${altLang}" href="${baseUrl}${url.pagePath}" />`);
+                        }, '');
+                        this.writeXmlUrl({
+                            baseUrl: this.localizedUrl(lang),
+                            url,
+                            alternateUrls,
+                        });
+                    });
+                });
+            }
+            else {
                 sitemap.forEach((url) => {
                     this.writeXmlUrl({
                         baseUrl: this.baseUrl,
@@ -63,32 +80,22 @@ class Core {
                 });
                 return;
             }
-            this.langs.forEach((lang) => {
-                const localizedBaseUrl = this.isSubdomain
-                    ? helpers_1.getLocalizedSubdomainUrl(this.baseUrl, lang)
-                    : `${this.baseUrl}/${lang}`;
-                sitemap.forEach((url) => {
-                    var _a;
-                    const alternateUrls = (_a = this.langs) === null || _a === void 0 ? void 0 : _a.reduce((accum, alternateLang) => {
-                        const localizedAlternateUrl = this.isSubdomain
-                            ? helpers_1.getLocalizedSubdomainUrl(this.baseUrl, alternateLang)
-                            : `${this.baseUrl}/${alternateLang}`;
-                        return (accum +
-                            `\n\t\t<xhtml:link rel="alternate" hreflang="${alternateLang}" href="${localizedAlternateUrl}${url.pagePath}" />`);
-                    }, '');
-                    this.writeXmlUrl({
-                        baseUrl: localizedBaseUrl,
-                        url,
-                        alternateUrls,
-                    });
-                });
-            });
         };
         this.writeXmlUrl = ({ baseUrl, url, alternateUrls }) => fs_1.default.writeFileSync(path_1.default.resolve(this.targetDirectory, './sitemap.xml'), helpers_1.getXmlUrl({ baseUrl, url, alternateUrls }), { flag: 'as' });
         this.writeFooter = () => fs_1.default.writeFileSync(path_1.default.resolve(this.targetDirectory, './sitemap.xml'), '\n</urlset>', { flag: 'as' });
+        this.localizedUrl = (lang) => {
+            if (lang === this.defaultLang) {
+                return this.baseUrl;
+            }
+            else {
+                return this.isSubdomain
+                    ? helpers_1.getLocalizedSubdomainUrl(this.baseUrl, lang)
+                    : `${this.baseUrl}/${lang}`;
+            }
+        };
         if (!config)
             throw new Error('Config is mandatory');
-        const { baseUrl, exclude = [], excludeExtensions = [], excludeIndex = true, include = [], isSubdomain = false, isTrailingSlashRequired = false, langs, nextConfigPath, pagesConfig = {}, pagesDirectory, sitemapStylesheet = [], targetDirectory, } = config;
+        const { baseUrl, exclude = [], excludeExtensions = [], excludeIndex = true, include = [], isSubdomain = false, isTrailingSlashRequired = false, defaultLang, langs = [], nextConfigPath, pagesConfig = {}, pagesDirectory, sitemapStylesheet = [], targetDirectory, } = config;
         this.baseUrl = baseUrl;
         this.include = include;
         this.excludeExtensions = excludeExtensions;
@@ -96,6 +103,7 @@ class Core {
         this.excludeIndex = excludeIndex;
         this.isSubdomain = isSubdomain;
         this.isTrailingSlashRequired = isTrailingSlashRequired;
+        this.defaultLang = (_a = defaultLang !== null && defaultLang !== void 0 ? defaultLang : langs[0]) !== null && _a !== void 0 ? _a : '';
         this.langs = langs;
         this.nextConfigPath = nextConfigPath;
         this.pagesConfig = pagesConfig;

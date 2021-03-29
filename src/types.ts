@@ -14,7 +14,8 @@ interface IConfig {
   include?: string[];
   isSubdomain?: boolean;
   isTrailingSlashRequired?: boolean;
-  langs?: string[];
+  defaultLang: string;
+  langs: string[];
   nextConfigPath?: string;
   pagesConfig?: IPagesConfig;
   pagesDirectory: string;

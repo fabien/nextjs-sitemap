@@ -33,7 +33,8 @@ class Core implements ICoreInterface {
   private include: string[];
   private isSubdomain: boolean;
   private isTrailingSlashRequired: boolean;
-  private langs?: string[];
+  private defaultLang: string;
+  private langs: string[];
   private nextConfigPath?: string;
   private pagesConfig: IPagesConfig;
   private pagesDirectory: string;
@@ -51,7 +52,8 @@ class Core implements ICoreInterface {
       include = [],
       isSubdomain = false,
       isTrailingSlashRequired = false,
-      langs,
+      defaultLang,
+      langs = [],
       nextConfigPath,
       pagesConfig = {},
       pagesDirectory,
@@ -66,6 +68,7 @@ class Core implements ICoreInterface {
     this.excludeIndex = excludeIndex;
     this.isSubdomain = isSubdomain;
     this.isTrailingSlashRequired = isTrailingSlashRequired;
+    this.defaultLang = defaultLang ?? langs[0] ?? '';
     this.langs = langs;
     this.nextConfigPath = nextConfigPath;
     this.pagesConfig = pagesConfig;
@@ -119,7 +122,27 @@ class Core implements ICoreInterface {
   };
 
   private writeSitemap = ({ sitemap }: IWriteSitemap): void => {
-    if (!this.langs) {
+    if (this.langs.length > 0) {
+      sitemap.forEach((url: ISitemapSite): void => {
+        this.langs.forEach((lang: string): void => {
+          const alternateUrls = this.langs.reduce(
+            (accum: string, altLang: string): string => {
+              const baseUrl: string = this.localizedUrl(altLang);
+              return (
+                accum +
+                `\n        <xhtml:link rel="alternate" hreflang="${altLang}" href="${baseUrl}${url.pagePath}" />`
+              );
+            },
+            '',
+          );
+          this.writeXmlUrl({
+            baseUrl: this.localizedUrl(lang),
+            url,
+            alternateUrls,
+          });
+        });
+      });
+    } else {
       sitemap.forEach((url: ISitemapSite): void => {
         this.writeXmlUrl({
           baseUrl: this.baseUrl,
@@ -128,34 +151,6 @@ class Core implements ICoreInterface {
       });
       return;
     }
-
-    this.langs.forEach((lang: string): void => {
-      const localizedBaseUrl = this.isSubdomain
-        ? getLocalizedSubdomainUrl(this.baseUrl, lang)
-        : `${this.baseUrl}/${lang}`;
-
-      sitemap.forEach((url: ISitemapSite): void => {
-        const alternateUrls = this.langs?.reduce(
-          (accum: string, alternateLang: string): string => {
-            const localizedAlternateUrl = this.isSubdomain
-              ? getLocalizedSubdomainUrl(this.baseUrl, alternateLang)
-              : `${this.baseUrl}/${alternateLang}`;
-
-            return (
-              accum +
-              `\n\t\t<xhtml:link rel="alternate" hreflang="${alternateLang}" href="${localizedAlternateUrl}${url.pagePath}" />`
-            );
-          },
-          '',
-        );
-
-        this.writeXmlUrl({
-          baseUrl: localizedBaseUrl,
-          url,
-          alternateUrls,
-        });
-      });
-    });
   };
 
   private writeXmlUrl = ({ baseUrl, url, alternateUrls }: IWriteXmlUrl): void =>
@@ -171,6 +166,16 @@ class Core implements ICoreInterface {
       '\n</urlset>',
       { flag: 'as' },
     );
+
+  private localizedUrl = (lang): string => {
+    if (lang === this.defaultLang) {
+      return this.baseUrl;
+    } else {
+      return this.isSubdomain
+        ? getLocalizedSubdomainUrl(this.baseUrl, lang)
+        : `${this.baseUrl}/${lang}`;
+    }
+  };
 }
 
 export function configureSitemap(config: IConfig): ICoreInterface {
